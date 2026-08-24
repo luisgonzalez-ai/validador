@@ -320,12 +320,7 @@ async function cargarBase() {
             )
             .trim(),
 
-          qrCode:
-            String(
-              bicicleta.qrCode || ""
-            )
-            .trim()
-            .toUpperCase()
+         qrCode: extraerCodigo(bicicleta.qrCode)
 
         })
       );
