@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
+
+<title>Validador QR</title>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+
+* {
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f8;
+}
+
+header {
+  background: #111;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+  padding: 20px;
+}
+
+.card {
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 15px;
+  box-shadow: 0 3px 12px rgba(0,0,0,.08);
+}
+
+.estado {
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+.cargando {
+  background: #fff3cd;
+}
+
+.ok {
+  background: #dff7e5;
+  border: 2px solid #38a169;
+}
+
+.error {
+  background: #ffe1e1;
+  border: 2px solid #e53e3e;
+}
+
+button {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  margin-top: 10px;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.btn-camera {
+  background: #111;
+  color: white;
+}
+
+.btn-stop {
+  background: #555;
+  color: white;
+}
+
+input {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  font-size: 17px;
+}
+
+.resultado {
+  display: none;
+  padding: 25px;
+  border-radius: 15px;
+  text-align: center;
+}
+
+.resultado.ok {
+  display: block;
+  background: #dff7e5;
+}
+
+.resultado.error {
+  display: block;
+  background: #ffe1e1;
+}
+
+.patrimonio {
+  font-size: 38px;
+  font-weight: bold;
+  margin: 15px 0;
+}
+
+.dato {
+  background: white;
+  padding: 12px;
+  margin-top: 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+#reader {
+  width: 100%;
+  margin-top: 15px;
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+<h1>🚲 Validador QR</h1>
+
+<p>
+Validación de bicicletas
+</p>
+
+</header>
+
+
+<div class="container">
+
+
+<!-- BASE -->
+
+<div class="card">
+
+<h2>📂 Base de bicicletas</h2>
+
+<div
+  id="estadoBase"
+  class="estado cargando"
+>
+
+Cargando validador.json...
+
+</div>
+
+</div>
+
+
+<!-- CAMARA -->
+
+<div class="card">
+
+<h2>📷 Escanear QR</h2>
+
+<button
+  class="btn-camera"
+  onclick="iniciarCamara()"
+>
+
+Abrir cámara
+
+</button>
+
+<button
+  class="btn-stop"
+  onclick="detenerCamara()"
+>
+
+Detener cámara
+
+</button>
+
+<div id="reader"></div>
+
+</div>
+
+
+<!-- BUSQUEDA MANUAL -->
+
+<div class="card">
+
+<h2>🔎 Buscar código</h2>
+
+<input
+  type="text"
+  id="codigoManual"
+  placeholder="QR o URL completa"
+>
+
+<button
+  class="btn-camera"
+  onclick="buscarManual()"
+>
+
+Validar
+
+</button>
+
+</div>
+
+
+<!-- RESULTADO -->
+
+<div
+  id="resultado"
+  class="resultado"
+></div>
+
+
+</div>
+
+
+<script>
+
+
+/* =====================================
+   VARIABLES
+===================================== */
+
+let baseBicicletas = [];
+
+let scanner = null;
+
+let escaneando = false;
+
+
+/* =====================================
+   CARGAR JSON
+===================================== */
+
+async function cargarBase() {
+
+  try {
+
+    const respuesta =
+      await fetch("validador.json");
+
+
+    if (!respuesta.ok) {
+
+      throw new Error(
+        "No se pudo cargar validador.json"
+      );
+
+    }
+
+
+    const datos =
+      await respuesta.json();
+
+
+    /*
+      Permite tanto:
+
+      [
+        {...},
+        {...}
+      ]
+
+      como un único objeto:
+
+      {...}
+    */
+
+    if (Array.isArray(datos)) {
+
+      baseBicicletas = datos;
+
+    } else {
+
+      baseBicicletas = [datos];
+
+    }
+
+
+    baseBicicletas =
+      baseBicicletas.map(
+        bicicleta => ({
+
+          msnbc:
+            String(
+              bicicleta.msnbc || ""
+            )
+            .trim()
+            .toUpperCase(),
+
+          Columna1:
+            String(
+              bicicleta.Columna1 || ""
+            )
+            .trim(),
+
+          qrCode:
+            String(
+              bicicleta.qrCode || ""
+            )
+            .trim()
+            .toUpperCase()
+
+        })
+      );
+
+
+    document
+      .getElementById("estadoBase")
+      .className =
+        "estado ok";
+
+
+    document
+      .getElementById("estadoBase")
+      .innerHTML =
+
+      `✅ Base cargada correctamente<br>
+       🚲 ${baseBicicletas.length}
+       bicicletas disponibles`;
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    document
+      .getElementById("estadoBase")
+      .className =
+        "estado error";
+
+
+    document
+      .getElementById("estadoBase")
+      .innerHTML =
+
+      `❌ No se pudo cargar
+       <strong>validador.json</strong>`;
+
+  }
+
+}
+
+
+/* =====================================
+   EXTRAER QR
+===================================== */
+
+function extraerCodigo(valor) {
+
+  let codigo =
+    String(valor).trim();
+
+
+  /*
+    Si el QR entrega:
+
+    https://qr.tembici.com/BIKEITAU?bike=XQQCSH
+
+    obtenemos:
+
+    XQQCSH
+  */
+
+  try {
+
+    const url =
+      new URL(codigo);
+
+
+    const parametro =
+      url.searchParams.get("bike");
+
+
+    if (parametro) {
+
+      codigo = parametro;
+
+    }
+
+  } catch (error) {
+
+    /*
+      Si no es URL,
+      usamos el valor directamente
+    */
+
+  }
+
+
+  return codigo
+    .trim()
+    .toUpperCase();
+
+}
+
+
+/* =====================================
+   VALIDAR
+===================================== */
+
+function validarCodigo(valor) {
+
+  if (
+    baseBicicletas.length === 0
+  ) {
+
+    alert(
+      "La base todavía no está cargada."
+    );
+
+    return;
+
+  }
+
+
+  const codigo =
+    extraerCodigo(valor);
+
+
+  const bicicleta =
+    baseBicicletas.find(
+
+      item =>
+        item.qrCode === codigo
+
+    );
+
+
+  if (bicicleta) {
+
+    mostrarValido(
+      bicicleta,
+      codigo
+    );
+
+  } else {
+
+    mostrarNoEncontrado(
+      codigo
+    );
+
+  }
+
+}
+
+
+/* =====================================
+   RESULTADO VALIDO
+===================================== */
+
+function mostrarValido(
+  bicicleta,
+  codigo
+) {
+
+  const resultado =
+    document.getElementById(
+      "resultado"
+    );
+
+
+  resultado.className =
+    "resultado ok";
+
+
+  resultado.innerHTML = `
+
+    <h2>
+      ✅ QR VÁLIDO
+    </h2>
+
+    <div class="patrimonio">
+
+      ${bicicleta.msnbc}
+
+    </div>
+
+    <div class="dato">
+
+      <strong>
+        Patrimonio
+      </strong>
+
+      <br>
+
+      ${bicicleta.msnbc}
+
+    </div>
+
+
+    <div class="dato">
+
+      <strong>
+        Tipo
+      </strong>
+
+      <br>
+
+      ${bicicleta.Columna1}
+
+    </div>
+
+
+    <div class="dato">
+
+      <strong>
+        QR
+      </strong>
+
+      <br>
+
+      ${codigo}
+
+    </div>
+
+  `;
+
+}
+
+
+/* =====================================
+   NO ENCONTRADO
+===================================== */
+
+function mostrarNoEncontrado(
+  codigo
+) {
+
+  const resultado =
+    document.getElementById(
+      "resultado"
+    );
+
+
+  resultado.className =
+    "resultado error";
+
+
+  resultado.innerHTML = `
+
+    <h2>
+      ❌ QR NO ENCONTRADO
+    </h2>
+
+    <div class="dato">
+
+      Código leído:
+
+      <strong>
+        ${codigo}
+      </strong>
+
+    </div>
+
+    <p>
+
+      Este código no tiene
+      un patrimonio asociado
+      en la base.
+
+    </p>
+
+  `;
+
+}
+
+
+/* =====================================
+   CAMARA
+===================================== */
+
+async function iniciarCamara() {
+
+  if (
+    baseBicicletas.length === 0
+  ) {
+
+    alert(
+      "Primero espera que cargue la base."
+    );
+
+    return;
+
+  }
+
+
+  if (escaneando) {
+
+    return;
+
+  }
+
+
+  scanner =
+    new Html5Qrcode(
+      "reader"
+    );
+
+
+  try {
+
+    await scanner.start(
+
+      {
+        facingMode:
+          "environment"
+      },
+
+      {
+
+        fps: 10,
+
+        qrbox: {
+          width: 250,
+          height: 250
+        }
+
+      },
+
+
+      async (textoLeido) => {
+
+        console.log(
+          "QR leído:",
+          textoLeido
+        );
+
+
+        /*
+          Validamos automáticamente
+        */
+
+        validarCodigo(
+          textoLeido
+        );
+
+
+        /*
+          Detenemos para evitar
+          múltiples lecturas
+        */
+
+        await detenerCamara();
+
+      }
+
+    );
+
+
+    escaneando = true;
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    alert(
+      "No se pudo acceder a la cámara. Revisa los permisos."
+    );
+
+  }
+
+}
+
+
+/* =====================================
+   DETENER CAMARA
+===================================== */
+
+async function detenerCamara() {
+
+  if (
+    scanner &&
+    escaneando
+  ) {
+
+    try {
+
+      await scanner.stop();
+
+      await scanner.clear();
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+  }
+
+
+  escaneando = false;
+
+}
+
+
+/* =====================================
+   BUSQUEDA MANUAL
+===================================== */
+
+function buscarManual() {
+
+  const campo =
+    document.getElementById(
+      "codigoManual"
+    );
+
+
+  const valor =
+    campo.value.trim();
+
+
+  if (!valor) {
+
+    return;
+
+  }
+
+
+  validarCodigo(
+    valor
+  );
+
+
+  campo.value = "";
+
+}
+
+
+/* =====================================
+   INICIAR
+===================================== */
+
+cargarBase();
+
+</script>
+
+
+</body>
+
+</html>
